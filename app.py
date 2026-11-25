@@ -1,8 +1,5 @@
 import streamlit as st
-import json
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
-from urllib.error import HTTPError, URLError
+from urllib.parse import quote_plus
 
 
 # ==========================================
@@ -50,7 +47,6 @@ st.markdown("""
     background: rgba(128,128,128,0.08);
     margin-bottom: 10px;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -67,129 +63,17 @@ if "completed" not in st.session_state:
 
 
 # ==========================================
-# YOUTUBE API FUNCTION
+# YOUTUBE SEARCH LINK FUNCTION
 # ==========================================
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def search_youtube_videos(api_key, query, max_results=5):
+def get_youtube_link(topic, lesson, level):
 
-    params = {
-        "part": "snippet",
-        "q": query,
-        "type": "video",
-        "maxResults": max_results,
-        "key": api_key
-    }
+    query = f"{topic} {lesson} {level} tutorial"
 
-    url = (
-        "https://www.googleapis.com/youtube/v3/search?"
-        + urlencode(params)
+    return (
+        "https://www.youtube.com/results?search_query="
+        + quote_plus(query)
     )
-
-    try:
-
-        request = Request(
-            url,
-            headers={"Accept": "application/json"}
-        )
-
-        with urlopen(request, timeout=20) as response:
-            data = json.loads(
-                response.read().decode("utf-8")
-            )
-
-        videos = []
-
-        for item in data.get("items", []):
-
-            video_id = item["id"]["videoId"]
-            snippet = item["snippet"]
-
-            videos.append({
-                "title": snippet["title"],
-                "channel": snippet["channelTitle"],
-                "url": (
-                    "https://www.youtube.com/watch?v="
-                    + video_id
-                )
-            })
-
-        return {
-            "videos": videos,
-            "error": None
-        }
-
-    except HTTPError as e:
-
-        try:
-            error_data = json.loads(
-                e.read().decode("utf-8")
-            )
-
-            reason = (
-                error_data.get("error", {})
-                .get("errors", [{}])[0]
-                .get("reason", "")
-            )
-
-        except Exception:
-            reason = ""
-
-        if e.code == 429 or reason == "rateLimitExceeded":
-
-            message = (
-                "YouTube rate limit reached. "
-                "Please wait before searching again."
-            )
-
-        elif reason in [
-            "quotaExceeded",
-            "dailyLimitExceeded"
-        ]:
-
-            message = (
-                "YouTube daily API quota exhausted. "
-                "Wait until the quota resets."
-            )
-
-        elif e.code == 403:
-
-            message = (
-                "YouTube API access denied. "
-                "Check API key restrictions and API settings."
-            )
-
-        elif e.code == 400:
-
-            message = (
-                "Invalid YouTube API request. "
-                "Please check the search query."
-            )
-
-        else:
-
-            message = f"YouTube API error: HTTP {e.code}"
-
-        return {
-            "videos": [],
-            "error": message
-        }
-
-    except URLError:
-
-        return {
-            "videos": [],
-            "error": (
-                "Network error. Check your internet connection."
-            )
-        }
-
-    except Exception as e:
-
-        return {
-            "videos": [],
-            "error": str(e)
-        }
 
 
 # ==========================================
@@ -218,7 +102,7 @@ def build_outline(topic, level, weeks, topics_per_module):
             "Problem-solving patterns"
         ]),
 
-        ("Intermediate concepts", [
+        ("Intermediate Concepts", [
             "Important techniques",
             "Real-world applications",
             "Worked examples"
@@ -230,7 +114,7 @@ def build_outline(topic, level, weeks, topics_per_module):
             "Review and improvement"
         ]),
 
-        ("Advanced learning", [
+        ("Advanced Learning", [
             "Advanced concepts",
             "Optimization and best practices",
             "Final revision"
@@ -243,9 +127,7 @@ def build_outline(topic, level, weeks, topics_per_module):
 
     modules = []
 
-    for i, (name, topics) in enumerate(
-        selected, start=1
-    ):
+    for i, (name, topics) in enumerate(selected, start=1):
 
         modules.append({
             "name": f"Module {i}: {name}",
@@ -278,7 +160,7 @@ page = st.sidebar.radio(
 st.sidebar.divider()
 
 st.sidebar.caption(
-    "CourseCraft AI • Improved Starter Version"
+    "CourseCraft AI • Improved Version"
 )
 
 
@@ -378,12 +260,6 @@ if page == "Create a course":
 
                 st.session_state.completed = set()
 
-                # Clear old video results
-                for key in list(st.session_state.keys()):
-
-                    if key.startswith("videos-"):
-                        del st.session_state[key]
-
                 st.success(
                     "Your learning path has been created!"
                 )
@@ -395,17 +271,16 @@ if page == "Create a course":
         st.markdown("""
         - Structured learning modules
         - Beginner to advanced topics
-        - YouTube lecture search
-        - Video titles and channel names
-        - Direct video links
+        - YouTube tutorial search
+        - Direct YouTube search links
         - Lesson completion tracker
         - Learning progress dashboard
         """)
 
         st.info(
-            "This starter version uses a predefined "
-            "course outline. AI syllabus generation "
-            "will be added in a future version."
+            "This version uses a predefined course outline "
+            "and YouTube search links. AI syllabus generation "
+            "can be added in a future version."
         )
 
 
@@ -454,37 +329,21 @@ if page == "Create a course":
 
 
         # ==========================================
-        # API KEY
+        # DISPLAY MODULES AND LESSONS
         # ==========================================
 
-        api_key = st.secrets.get(
-            "YOUTUBE_API_KEY",
-            ""
-        )
-
-
-        # ==========================================
-        # DISPLAY MODULES
-        # ==========================================
-
-        for mi, module in enumerate(
-            course["modules"]
-        ):
+        for mi, module in enumerate(course["modules"]):
 
             with st.expander(
                 f"{module['name']} · Week {module['week']}",
                 expanded=(mi == 0)
             ):
 
-                for ti, lesson in enumerate(
-                    module["topics"]
-                ):
+                for ti, lesson in enumerate(module["topics"]):
 
                     key = f"{mi}-{ti}"
 
-                    col1, col2 = st.columns(
-                        [0.08, 0.92]
-                    )
+                    col1, col2 = st.columns([0.08, 0.92])
 
                     with col1:
 
@@ -492,102 +351,36 @@ if page == "Create a course":
                             "Done",
                             key=f"check-{key}",
                             value=(
-                                key in
-                                st.session_state.completed
+                                key in st.session_state.completed
                             ),
                             label_visibility="collapsed"
                         )
 
                         if checked:
 
-                            st.session_state.completed.add(
-                                key
-                            )
+                            st.session_state.completed.add(key)
 
                         else:
 
-                            st.session_state.completed.discard(
-                                key
-                            )
+                            st.session_state.completed.discard(key)
 
                     with col2:
 
-                        st.markdown(
-                            f"### {lesson}"
+                        st.markdown(f"### {lesson}")
+
+                        youtube_link = get_youtube_link(
+                            course["topic"],
+                            lesson,
+                            course["level"]
                         )
 
-                        search_query = (
-                            f"{course['topic']} "
-                            f"{lesson} "
-                            f"{course['level']} tutorial"
+                        st.link_button(
+                            "▶ Find YouTube Videos",
+                            youtube_link,
+                            use_container_width=True
                         )
 
-                        if not api_key:
-
-                            st.error(
-                                "YouTube API key is missing. "
-                                "Add YOUTUBE_API_KEY in "
-                                "Streamlit Secrets."
-                            )
-
-                        else:
-
-                            if st.button(
-                                "🔍 Find YouTube Videos",
-                                key=f"search-{key}"
-                            ):
-
-                                with st.spinner(
-                                    "Searching YouTube..."
-                                ):
-
-                                    result = search_youtube_videos(
-                                        api_key,
-                                        search_query,
-                                        max_results=5
-                                    )
-
-                                    st.session_state[
-                                        f"videos-{key}"
-                                    ] = result
-
-                            result = st.session_state.get(
-                                f"videos-{key}"
-                            )
-
-                            if result is not None:
-
-                                if result["error"]:
-
-                                    st.warning(
-                                        result["error"]
-                                    )
-
-                                elif result["videos"]:
-
-                                    for video in result["videos"]:
-
-                                        st.markdown(
-                                            f"""
-                                            <div class="video-card">
-                                            <b>{video['title']}</b><br>
-                                            Teacher: {video['channel']}<br>
-                                            <a href="{video['url']}"
-                                            target="_blank">
-                                            ▶ Watch Video
-                                            </a>
-                                            </div>
-                                            """,
-                                            unsafe_allow_html=True
-                                        )
-
-                                else:
-
-                                    st.info(
-                                        "No matching videos found."
-                                    )
-
-                        st.divider()
+                    st.divider()
 
 
 # ==========================================
@@ -620,23 +413,29 @@ elif page == "My learning dashboard":
             st.session_state.completed
         )
 
-        st.metric(
-            "Lessons Completed",
-            f"{done}/{total}"
-        )
-
-        st.progress(
-            done / total if total else 0
-        )
-
         percentage = (
             round(done / total * 100)
             if total else 0
         )
 
-        st.metric(
-            "Course Progress",
-            f"{percentage}%"
+        col1, col2 = st.columns(2)
+
+        with col1:
+
+            st.metric(
+                "Lessons Completed",
+                f"{done}/{total}"
+            )
+
+        with col2:
+
+            st.metric(
+                "Course Progress",
+                f"{percentage}%"
+            )
+
+        st.progress(
+            done / total if total else 0
         )
 
         st.write(
@@ -647,9 +446,15 @@ elif page == "My learning dashboard":
             f"**Duration:** {course['weeks']} weeks"
         )
 
+        if course["goal"]:
+
+            st.write(
+                f"**Learning Goal:** {course['goal']}"
+            )
+
         st.caption(
-            "Progress is stored in the current "
-            "browser session in this starter version."
+            "Progress is stored in the current browser "
+            "session in this starter version."
         )
 
 
@@ -664,7 +469,8 @@ else:
     st.write(
         "CourseCraft AI is a personal learning "
         "assistant that helps learners organize "
-        "their education through YouTube lectures."
+        "their education through structured modules "
+        "and YouTube learning resources."
     )
 
     st.subheader("Technologies Used")
@@ -672,9 +478,8 @@ else:
     st.markdown("""
     1. **Python** – Main programming language.
     2. **Streamlit** – Web application framework.
-    3. **YouTube Data API v3** – Video search integration.
-    4. **JSON** – Data exchange format.
-    5. **GitHub** – Source code management.
+    3. **YouTube Search Links** – Educational video discovery.
+    4. **GitHub** – Source code management.
     """)
 
     st.subheader("Project Features")
@@ -682,11 +487,10 @@ else:
     st.markdown("""
     - Course outline generation
     - Topic-wise learning modules
-    - YouTube video search
+    - YouTube tutorial search
     - Learning progress tracking
-    - Dashboard
-    - API error handling
-    - Cached video search results
+    - Interactive dashboard
+    - Beginner-friendly interface
     """)
 
     st.subheader("Future Improvements")
