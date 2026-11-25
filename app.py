@@ -63,17 +63,20 @@ if "completed" not in st.session_state:
 
 
 # ==========================================
-# YOUTUBE SEARCH LINK FUNCTION
+# YOUTUBE VIDEO LINK FUNCTION
 # ==========================================
 
 def get_youtube_link(topic, lesson, level):
 
     query = f"{topic} {lesson} {level} tutorial"
 
-    return (
+    search_url = (
         "https://www.youtube.com/results?search_query="
         + quote_plus(query)
+        + "&sp=CAM%253D"
     )
+
+    return search_url
 
 
 # ==========================================
@@ -175,8 +178,8 @@ if page == "Create a course":
         <h1>🎓 Build Your Own Learning Path</h1>
         <p>
         Choose what you want to learn.
-        Create a structured course and find
-        relevant YouTube lectures.
+        Create a structured course and discover
+        popular YouTube tutorials.
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -271,16 +274,16 @@ if page == "Create a course":
         st.markdown("""
         - Structured learning modules
         - Beginner to advanced topics
-        - YouTube tutorial search
-        - Direct YouTube search links
+        - Popular YouTube tutorial links
+        - Lessons organized topic-wise
         - Lesson completion tracker
         - Learning progress dashboard
         """)
 
         st.info(
-            "This version uses a predefined course outline "
-            "and YouTube search links. AI syllabus generation "
-            "can be added in a future version."
+            "YouTube links open search results "
+            "prioritized by view count. "
+            "No API key is required."
         )
 
 
@@ -357,27 +360,22 @@ if page == "Create a course":
                         )
 
                         if checked:
-
                             st.session_state.completed.add(key)
-
                         else:
-
                             st.session_state.completed.discard(key)
 
                     with col2:
 
                         st.markdown(f"### {lesson}")
 
-                        youtube_link = get_youtube_link(
+                        video_link = get_youtube_link(
                             course["topic"],
                             lesson,
                             course["level"]
                         )
 
-                        st.link_button(
-                            "▶ Find YouTube Videos",
-                            youtube_link,
-                            use_container_width=True
+                        st.markdown(
+                            f"▶ [Watch popular YouTube tutorials]({video_link})"
                         )
 
                     st.divider()
@@ -438,23 +436,16 @@ elif page == "My learning dashboard":
             done / total if total else 0
         )
 
-        st.write(
-            f"**Level:** {course['level']}"
-        )
+        st.write(f"**Level:** {course['level']}")
 
-        st.write(
-            f"**Duration:** {course['weeks']} weeks"
-        )
+        st.write(f"**Duration:** {course['weeks']} weeks")
 
         if course["goal"]:
-
-            st.write(
-                f"**Learning Goal:** {course['goal']}"
-            )
+            st.write(f"**Learning Goal:** {course['goal']}")
 
         st.caption(
-            "Progress is stored in the current browser "
-            "session in this starter version."
+            "Progress is stored in the current "
+            "browser session in this starter version."
         )
 
 
@@ -470,7 +461,7 @@ else:
         "CourseCraft AI is a personal learning "
         "assistant that helps learners organize "
         "their education through structured modules "
-        "and YouTube learning resources."
+        "and popular YouTube learning resources."
     )
 
     st.subheader("Technologies Used")
@@ -478,7 +469,7 @@ else:
     st.markdown("""
     1. **Python** – Main programming language.
     2. **Streamlit** – Web application framework.
-    3. **YouTube Search Links** – Educational video discovery.
+    3. **YouTube Search** – Educational video discovery.
     4. **GitHub** – Source code management.
     """)
 
@@ -487,7 +478,7 @@ else:
     st.markdown("""
     - Course outline generation
     - Topic-wise learning modules
-    - YouTube tutorial search
+    - Popular YouTube tutorial links
     - Learning progress tracking
     - Interactive dashboard
     - Beginner-friendly interface
@@ -497,7 +488,7 @@ else:
 
     st.markdown("""
     1. AI-based syllabus generation.
-    2. Automatic video relevance ranking.
+    2. Automatic video recommendations.
     3. User login and registration.
     4. Database integration.
     5. Personalized learning recommendations.
